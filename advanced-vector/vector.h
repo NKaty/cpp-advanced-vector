@@ -193,11 +193,7 @@ class Vector {
       return;
     }
     RawMemory<T> new_data(new_capacity);
-    if constexpr (std::is_nothrow_move_constructible_v<T> || !std::is_copy_constructible_v<T>) {
-      std::uninitialized_move_n(begin(), size_, new_data.GetAddress());
-    } else {
-      std::uninitialized_copy_n(begin(), size_, new_data.GetAddress());
-    }
+    InitializeRawMemory(begin(), size_, new_data.GetAddress());
     std::destroy_n(begin(), size_);
     data_.Swap(new_data);
   }
@@ -231,11 +227,7 @@ class Vector {
       RawMemory<T> new_data(size_ == 0 ? 1 : size_ * 2);
       new(new_data.GetAddress() + size_) T(std::forward<Args>(args)...);
       try {
-        if constexpr (std::is_nothrow_move_constructible_v<T> || !std::is_copy_constructible_v<T>) {
-          std::uninitialized_move_n(begin(), size_, new_data.GetAddress());
-        } else {
-          std::uninitialized_copy_n(begin(), size_, new_data.GetAddress());
-        }
+        InitializeRawMemory(begin(), size_, new_data.GetAddress());
       } catch (...) {
         std::destroy_at(new_data.GetAddress() + size_);
         throw;
@@ -257,25 +249,13 @@ class Vector {
       RawMemory<T> new_data(size_ == 0 ? 1 : size_ * 2);
       new(new_data.GetAddress() + index) T(std::forward<Args>(args)...);
       try {
-        if constexpr (std::is_nothrow_move_constructible_v<T> || !std::is_copy_constructible_v<T>) {
-          std::uninitialized_move_n(begin(), index, new_data.GetAddress());
-        } else {
-          std::uninitialized_copy_n(begin(), index, new_data.GetAddress());
-        }
+        InitializeRawMemory(begin(), index, new_data.GetAddress());
       } catch (...) {
         std::destroy_at(new_data.GetAddress() + index);
         throw;
       }
       try {
-        if constexpr (std::is_nothrow_move_constructible_v<T> || !std::is_copy_constructible_v<T>) {
-          std::uninitialized_move_n(begin() + index,
-                                    size_ - index,
-                                    new_data.GetAddress() + index + 1);
-        } else {
-          std::uninitialized_copy_n(begin() + index,
-                                    size_ - index,
-                                    new_data.GetAddress() + index + 1);
-        }
+        InitializeRawMemory(begin() + index, size_ - index, new_data.GetAddress() + index + 1);
       } catch (...) {
         std::destroy_n(new_data.GetAddress(), index + 1);
         throw;
@@ -314,4 +294,12 @@ class Vector {
  private:
   RawMemory<T> data_;
   size_t size_ = 0;
+
+  void InitializeRawMemory(iterator source_start, size_t count, iterator dest_start) {
+    if constexpr (std::is_nothrow_move_constructible_v<T> || !std::is_copy_constructible_v<T>) {
+      std::uninitialized_move_n(source_start, count, dest_start);
+    } else {
+      std::uninitialized_copy_n(source_start, count, dest_start);
+    }
+  }
 };
